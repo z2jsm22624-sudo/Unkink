@@ -61,7 +61,8 @@ export default function App() {
       setCurrentUser(parsedUser);
 
       const onboardingCompleted = await AsyncStorage.getItem('@deskreset_onboarding_completed');
-      setAuthRoute(onboardingCompleted === 'true' ? 'home' : 'onboarding');
+      const shouldShowOnboarding = onboardingCompleted !== 'true';
+      setAuthRoute(shouldShowOnboarding ? 'onboarding' : 'home');
     } catch (error) {
       console.error('Failed to load stored user:', error);
       setAuthRoute('auth');
@@ -213,7 +214,13 @@ export default function App() {
 
   const handleAuthSuccess = async (user: StoredUser, isNewUser: boolean) => {
     setCurrentUser(user);
+    await AsyncStorage.setItem('@unkink_user', JSON.stringify(user));
+
     const onboardingCompleted = await AsyncStorage.getItem('@deskreset_onboarding_completed');
+    if (isNewUser) {
+      await AsyncStorage.setItem('@deskreset_onboarding_completed', 'false');
+    }
+
     setAuthRoute(isNewUser || onboardingCompleted !== 'true' ? 'onboarding' : 'home');
   };
 
