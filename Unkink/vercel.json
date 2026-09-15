@@ -1,7 +1,6 @@
 {
-  "buildCommand": "npx expo export -p web",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "cleanUrls": true,
   "routes": [
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
