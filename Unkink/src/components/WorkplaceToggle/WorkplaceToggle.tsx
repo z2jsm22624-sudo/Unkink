@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Switch, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Theme } from '../../constants/themes';
+import type { Theme } from '../../constants/themes';
 
 interface WorkplaceToggleProps {
   theme: Theme;
@@ -10,35 +10,40 @@ interface WorkplaceToggleProps {
   streakCount: number;
 }
 
-export const WorkplaceToggle: React.FC = ({
+export const WorkplaceToggle: React.FC<WorkplaceToggleProps> = ({
   theme,
   isDeskMode,
   onToggle,
   streakCount,
 }) => {
-  const handleToggle = (value: boolean) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleToggle = async (value: boolean) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onToggle(value);
   };
 
   return (
-    
-      
-        Unkink
-        
+    <View style={styles.headerContainer}>
+      <View style={styles.titleWrapper}>
+        <Text style={[styles.appTitle, { color: theme.textPrimary }]}>Unkink</Text>
+        <Text style={[styles.streakText, { color: theme.textSecondary }]}>
           🔥 {streakCount} Day{streakCount === 1 ? '' : 's'} Streak
-        
-      
+        </Text>
+      </View>
 
-      
-        
-          
-            {isDeskMode ? 'DESK' : 'OPEN'}
-          
-        
-        
-      
-    
+      <View style={styles.toggleWrapper}>
+        <View style={styles.labelContainer}>
+          <Text style={[styles.toggleLabel, { color: theme.textPrimary }]}> {isDeskMode ? 'DESK' : 'OPEN'} </Text>
+        </View>
+
+        <Switch
+          value={isDeskMode}
+          onValueChange={handleToggle}
+          trackColor={{ false: theme.toggleBg, true: theme.accent }}
+          thumbColor={isDeskMode ? theme.background : theme.cardBg}
+          ios_backgroundColor={theme.toggleBg}
+        />
+      </View>
+    </View>
   );
 };
 
@@ -51,7 +56,6 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 15,
     width: '100%',
-    direction: 'ltr',
   },
   titleWrapper: {
     flexDirection: 'column',
@@ -71,7 +75,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    direction: 'ltr',
   },
   labelContainer: {
     minWidth: 50,
