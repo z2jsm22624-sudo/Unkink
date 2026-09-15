@@ -6,13 +6,19 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { WaterFootnote } from './WaterFootnote';
 
 interface WaterFillGaugeProps {
   score: number;
-  delta: number;
+  delta?: number;
+  previousWeeklyWater?: number;
 }
 
-export const WaterFillGauge: React.FC<WaterFillGaugeProps> = ({ score, delta }) => {
+export const WaterFillGauge: React.FC<WaterFillGaugeProps> = ({
+  score,
+  delta = 0,
+  previousWeeklyWater,
+}) => {
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -41,11 +47,20 @@ export const WaterFillGauge: React.FC<WaterFillGaugeProps> = ({ score, delta }) 
         </View>
       </View>
 
-      <View style={styles.deltaWrap}>
-        <Text style={[styles.deltaText, delta >= 0 ? styles.deltaPositive : styles.deltaNegative]}>
-          {deltaText}
-        </Text>
-      </View>
+      {previousWeeklyWater !== undefined ? (
+        <WaterFootnote
+          currentWeeklyWater={score}
+          previousWeeklyWater={previousWeeklyWater}
+        />
+      ) : (
+        <View style={styles.deltaWrap}>
+          <Text
+            style={[styles.deltaText, delta >= 0 ? styles.deltaPositive : styles.deltaNegative]}
+          >
+            {deltaText}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
