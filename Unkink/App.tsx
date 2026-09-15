@@ -12,7 +12,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { onAuthStateChanged } from 'firebase/auth';
 
+import { auth } from './src/config/firebase';
 import { deskTheme, openSpaceTheme } from './src/constants/themes';
 import { type BodyView, type BodyZoneId } from './src/constants/data';
 
@@ -31,6 +33,22 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
+const getLocalDateString = (date: Date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getDaysDifference = (fromDateStr: string, toDateStr: string) => {
+  const [y1, m1, d1] = fromDateStr.split('-').map(Number);
+  const [y2, m2, d2] = toDateStr.split('-').map(Number);
+  const from = new Date(y1, m1 - 1, d1);
+  const to = new Date(y2, m2 - 1, d2);
+  const diffTime = to.getTime() - from.getTime();
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
+};
 
 export default function App() {
   const [authRoute, setAuthRoute] = useState<'checking' | 'auth' | 'onboarding' | 'home'>('checking');
@@ -61,8 +79,10 @@ export default function App() {
       setCurrentUser(parsedUser);
 
       const onboardingCompleted = await AsyncStorage.getItem('@deskreset_onboarding_completed');
-      const shouldShowOnboarding = onboardingCompleted !== 'true';
-      setAuthRoute(shouldShowOnboarding ? 'onboarding' : 'home');
+      const hasStoredUser = Boolean(parsedUser?.uid);
+      const hasCompletedOnboarding = onboardingCompleted === 'true';
+
+      setAuthRoute(hasStoredUser && hasCompletedOnboarding ? 'home' : 'onboarding');
     } catch (error) {
       console.error('Failed to load stored user:', error);
       setAuthRoute('auth');
@@ -70,7 +90,26 @@ export default function App() {
   };
 
   useEffect(() => {
-    loadStoredUser();
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const user: StoredUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email ?? '',
+          displayName: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'Unkink user',
+        };
+
+        setCurrentUser(user);
+        await AsyncStorage.setItem('@unkink_user', JSON.stringify(user));
+
+        const onboardingCompleted = await AsyncStorage.getItem('@deskreset_onboarding_completed');
+        setAuthRoute(onboardingCompleted === 'true' ? 'home' : 'onboarding');
+        return;
+      }
+
+      await loadStoredUser();
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -89,8 +128,22 @@ export default function App() {
   const loadStreak = async () => {
     try {
       const savedStreak = await AsyncStorage.getItem('@deskreset_streak');
-      if (savedStreak !== null) {
-        setStreakCount(parseInt(savedStreak, 10));
+      const lastStreakDate = await AsyncStorage.getItem('@deskreset_last_streak_date');
+      const streak = savedStreak !== null ? parseInt(savedStreak, 10) : 0;
+      const today = getLocalDateString();
+
+      if (!lastStreakDate) {
+        setStreakCount(streak);
+        return;
+      }
+
+      const diff = getDaysDifference(lastStreakDate, today);
+
+      if (diff === 0 || diff === 1) {
+        setStreakCount(streak);
+      } else {
+        setStreakCount(0);
+        await AsyncStorage.setItem('@deskreset_streak', '0');
       }
     } catch (e) {
       console.error('Failed to load streak', e);
@@ -151,15 +204,52 @@ export default function App() {
   };
 
   const handleCompleteReset = async () => {
-    const newStreak = streakCount + 1;
-    setStreakCount(newStreak);
     try {
+      const today = getLocalDateString();
+      const lastStreakDate = await AsyncStorage.getItem('@deskreset_last_streak_date');
+      const savedStreak = await AsyncStorage.getItem('@deskreset_streak');
+      const currentStreak = savedStreak !== null ? parseInt(savedStreak, 10) : streakCount;
+
+      let newStreak = 1;
+
+      if (lastStreakDate) {
+        const diff = getDaysDifference(lastStreakDate, today);
+
+        if (diff === 0) {
+          // Already completed an exercise today: preserve current daily streak
+          setSelectedZone(null);
+          Alert.alert(
+            'Reset Complete! 🎉',
+            `Great job! You've already maintained your ${currentStreak || 1}-day streak today.`
+          );
+          return;
+        } else if (diff === 1) {
+          // Consecutive day: increment streak by 1
+          newStreak = (currentStreak > 0 ? currentStreak : 0) + 1;
+        } else {
+          // Missed one or more days: reset to 1
+          newStreak = 1;
+        }
+      } else {
+        newStreak = 1;
+      }
+
+      setStreakCount(newStreak);
       await AsyncStorage.setItem('@deskreset_streak', newStreak.toString());
+      await AsyncStorage.setItem('@deskreset_last_streak_date', today);
+
+      setSelectedZone(null);
+      Alert.alert(
+        'Reset Complete! 🎉',
+        newStreak === 1
+          ? 'Daily streak started! Complete an exercise tomorrow to keep it going.'
+          : `Daily streak updated! You're on a ${newStreak}-day streak! 🔥`
+      );
     } catch (e) {
       console.error('Failed to save streak', e);
+      setSelectedZone(null);
+      Alert.alert('Reset Complete! 🎉', 'Your exercise has been completed.');
     }
-    setSelectedZone(null);
-    Alert.alert('Reset Complete! 🎉', 'Your daily streak has been updated.');
   };
 
   const handleOnboardingSubmit = async () => {
@@ -217,11 +307,13 @@ export default function App() {
     await AsyncStorage.setItem('@unkink_user', JSON.stringify(user));
 
     const onboardingCompleted = await AsyncStorage.getItem('@deskreset_onboarding_completed');
-    if (isNewUser) {
+    const needsOnboarding = isNewUser || onboardingCompleted !== 'true';
+
+    if (needsOnboarding) {
       await AsyncStorage.setItem('@deskreset_onboarding_completed', 'false');
     }
 
-    setAuthRoute(isNewUser || onboardingCompleted !== 'true' ? 'onboarding' : 'home');
+    setAuthRoute(needsOnboarding ? 'onboarding' : 'home');
   };
 
   const handleOnboardingComplete = async () => {
