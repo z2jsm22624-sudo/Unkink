@@ -4,6 +4,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AIInsightCard } from './AIInsightCard';
 import { HistogramChart } from './HistogramChart';
 import { WaterFillGauge } from './WaterFillGauge';
+import {
+  getWeeklyWaterData,
+  getLocalWeeklyStats,
+  type WeeklyWaterData,
+} from '../services/waterStorageService';
 
 interface WeeklyInsightsResponse {
   weeklyRecoveryScore: number;
@@ -26,41 +31,91 @@ interface WeeklyReviewScreenProps {
 
 export const WeeklyReviewScreen: React.FC<WeeklyReviewScreenProps> = ({ userId, onClose }) => {
   const [data, setData] = useState<WeeklyInsightsResponse | null>(null);
+  const [waterData, setWaterData] = useState<WeeklyWaterData>({
+    currentWeeklyWater: 0,
+    previousWeeklyWater: 0,
+    lastWeeklyReset: 0,
+    dailyGains: [0, 0, 0, 0, 0, 0, 0],
+  });
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    const fetchWeeklyInsights = async () => {
+    const loadData = async () => {
       try {
         setIsLoading(true);
-        setError(null);
 
-        const response = await fetch('/api/generate-weekly-insights', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId }),
-        });
+        // 1. Fetch real water storage & local stats
+        const [savedWater, localStats] = await Promise.all([
+          getWeeklyWaterData(),
+          getLocalWeeklyStats(),
+        ]);
 
-        if (!response.ok) {
-          throw new Error(`Request failed with ${response.status}`);
+        if (isMounted) {
+          setWaterData(savedWater);
         }
 
-        const payload = (await response.json()) as WeeklyInsightsResponse;
+        // 2. Try fetching server insights if available
+        let serverData: WeeklyInsightsResponse | null = null;
+        try {
+          const response = await fetch('/api/generate-weekly-insights', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          });
+
+          if (response.ok) {
+            serverData = (await response.json()) as WeeklyInsightsResponse;
+          }
+        } catch {
+          // Offline / local fallback
+        }
 
         if (!isMounted) {
           return;
         }
 
-        setData(payload);
-      } catch (caughtError) {
-        console.warn('Weekly review fetch failed:', caughtError);
+        if (serverData && !serverData.empty) {
+          setData({
+            ...serverData,
+            weeklyRecoveryScore: savedWater.currentWeeklyWater || serverData.weeklyRecoveryScore,
+            scoreDelta: savedWater.currentWeeklyWater - savedWater.previousWeeklyWater,
+            histogramData: serverData.histogramData?.some((v) => v > 0)
+              ? serverData.histogramData
+              : localStats.histogramData,
+          });
+        } else {
+          // Generate fallback local insights based on real user activity
+          const topZone = Object.entries(localStats.topTargetedZones).sort(
+            (a, b) => b[1] - a[1]
+          )[0]?.[0];
 
-        if (isMounted) {
-          setData(null);
-          setError(null);
+          setData({
+            weeklyRecoveryScore: savedWater.currentWeeklyWater,
+            scoreDelta: savedWater.currentWeeklyWater - savedWater.previousWeeklyWater,
+            histogramData: savedWater.dailyGains,
+            topTargetedZones: localStats.topTargetedZones,
+            deskModeRatio: localStats.deskModeRatio,
+            weeklyTitle:
+              savedWater.currentWeeklyWater >= 50
+                ? 'Strong Ergonomic Rhythm ⚡'
+                : 'Building Your Reset Routine 🌱',
+            insightSummary: topZone
+              ? `You focused most of your tension relief on your ${topZone} this week.`
+              : 'Complete quick 30-second resets to fill your recovery gauge and relieve physical fatigue.',
+            workspaceTweak:
+              localStats.deskModeRatio.desk > 60
+                ? 'Try alternating between seated and standing micro-stretches during long focus blocks.'
+                : 'Keep your monitor at eye level to prevent recurring neck tension.',
+            nextWeekFocus: topZone
+              ? `Incorporate daily ${topZone} mobility resets at mid-day.`
+              : 'Aim for at least one daily reset to maintain your streak.',
+            empty: false,
+          });
         }
+      } catch (caughtError) {
+        console.warn('Weekly review load failed:', caughtError);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -68,7 +123,7 @@ export const WeeklyReviewScreen: React.FC<WeeklyReviewScreenProps> = ({ userId, 
       }
     };
 
-    fetchWeeklyInsights();
+    loadData();
 
     return () => {
       isMounted = false;
@@ -76,9 +131,11 @@ export const WeeklyReviewScreen: React.FC<WeeklyReviewScreenProps> = ({ userId, 
   }, [userId]);
 
   const histogramData = data?.histogramData ?? [0, 0, 0, 0, 0, 0, 0];
-  const score = data?.weeklyRecoveryScore ?? 0;
-  const delta = data?.scoreDelta ?? 0;
-  const isDataAvailable = Boolean(data && !data.empty && (data.weeklyRecoveryScore > 0 || data.histogramData?.some((value) => value > 0)));
+  const score = Math.round(waterData.currentWeeklyWater);
+  const delta = Math.round(waterData.currentWeeklyWater - waterData.previousWeeklyWater);
+  const isDataAvailable = Boolean(
+    waterData.currentWeeklyWater > 0 || histogramData.some((value) => value > 0)
+  );
 
   return (
     <View style={styles.overlay}>
@@ -91,7 +148,11 @@ export const WeeklyReviewScreen: React.FC<WeeklyReviewScreenProps> = ({ userId, 
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-          <WaterFillGauge score={score} delta={delta} />
+          <WaterFillGauge
+            score={score}
+            delta={delta}
+            previousWeeklyWater={waterData.previousWeeklyWater}
+          />
           <HistogramChart data={histogramData} />
           <AIInsightCard
             isLoading={isLoading}

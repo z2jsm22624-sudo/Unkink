@@ -22,6 +22,7 @@ import { BioMatrixCanvas } from './src/components/BioMatrixCanvas';
 import { ExercisePlayerSheet } from './src/components/ExercisePlayerSheet';
 import { WeeklyReviewScreen } from './src/components/WeeklyReviewScreen';
 import { registerGeminiBackgroundTask } from './src/services/geminiService';
+import { addExerciseWater, logCompletedExercise } from './src/services/waterStorageService';
 import AuthScreen, { type StoredUser } from './src/screens/AuthScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 
@@ -210,28 +211,39 @@ export default function App() {
       const savedStreak = await AsyncStorage.getItem('@deskreset_streak');
       const currentStreak = savedStreak !== null ? parseInt(savedStreak, 10) : streakCount;
 
-      let newStreak = 1;
+      // 1. Accumulate water gain: 3% base + 30s * 0.02% (0.6%) + (targetZone ? 1% : 0%)
+      const isTargetZone = Boolean(selectedZone);
+      const waterResult = await addExerciseWater(30, isTargetZone);
 
-      if (lastStreakDate) {
+      // 2. Log activity session
+      await logCompletedExercise({
+        zone: selectedZone ?? 'general',
+        isDeskMode,
+        duration: 30,
+      });
+
+      // 3. Update daily streak
+      let newStreak = currentStreak;
+      let isStreakUpdated = false;
+
+      if (!lastStreakDate) {
+        newStreak = 1;
+        isStreakUpdated = true;
+      } else {
         const diff = getDaysDifference(lastStreakDate, today);
 
         if (diff === 0) {
-          // Already completed an exercise today: preserve current daily streak
-          setSelectedZone(null);
-          Alert.alert(
-            'Reset Complete! 🎉',
-            `Great job! You've already maintained your ${currentStreak || 1}-day streak today.`
-          );
-          return;
+          // Already completed an exercise today: keep current daily streak
+          newStreak = currentStreak > 0 ? currentStreak : 1;
         } else if (diff === 1) {
           // Consecutive day: increment streak by 1
           newStreak = (currentStreak > 0 ? currentStreak : 0) + 1;
+          isStreakUpdated = true;
         } else {
           // Missed one or more days: reset to 1
           newStreak = 1;
+          isStreakUpdated = true;
         }
-      } else {
-        newStreak = 1;
       }
 
       setStreakCount(newStreak);
@@ -239,15 +251,20 @@ export default function App() {
       await AsyncStorage.setItem('@deskreset_last_streak_date', today);
 
       setSelectedZone(null);
-      Alert.alert(
-        'Reset Complete! 🎉',
-        newStreak === 1
-          ? 'Daily streak started! Complete an exercise tomorrow to keep it going.'
-          : `Daily streak updated! You're on a ${newStreak}-day streak! 🔥`
-      );
+      setRecommendedExerciseIds(null);
+
+      const alertTitle = 'Reset Complete! 🎉';
+      const alertMsg = isStreakUpdated
+        ? (newStreak === 1
+            ? `Daily streak started! Recovery level: ${waterResult.currentWeeklyWater}%.`
+            : `Daily streak: ${newStreak} days! 🔥 Recovery level: ${waterResult.currentWeeklyWater}%.`)
+        : `Recovery level: ${waterResult.currentWeeklyWater}% (+${(3.6 + (isTargetZone ? 1 : 0)).toFixed(1)}%). Streak maintained (${newStreak} day${newStreak === 1 ? '' : 's'})!`;
+
+      Alert.alert(alertTitle, alertMsg);
     } catch (e) {
-      console.error('Failed to save streak', e);
+      console.error('Failed to complete reset', e);
       setSelectedZone(null);
+      setRecommendedExerciseIds(null);
       Alert.alert('Reset Complete! 🎉', 'Your exercise has been completed.');
     }
   };
