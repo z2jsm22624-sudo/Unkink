@@ -10,7 +10,7 @@ interface WorkplaceToggleProps {
   streakCount: number;
 }
 
-export const WorkplaceToggle: React.FC<WorkplaceToggleProps> = ({
+export const WorkplaceToggle: React.FC = ({
   theme,
   isDeskMode,
   onToggle,
@@ -22,26 +22,23 @@ export const WorkplaceToggle: React.FC<WorkplaceToggleProps> = ({
   };
 
   return (
-    <View style={styles.headerContainer}>
-      <View>
-        <Text style={[styles.appTitle, { color: theme.textPrimary }]}>Unkink</Text>
-        <Text style={[styles.streakText, { color: theme.accent }]}>
+    
+      
+        Unkink
+        
           🔥 {streakCount} Day{streakCount === 1 ? '' : 's'} Streak
-        </Text>
-      </View>
+        
+      
 
-      <View style={styles.toggleWrapper}>
-        <Text style={[styles.toggleLabel, { color: theme.textSecondary }]}>
-          {isDeskMode ? 'Desk' : 'Open Space'}
-        </Text>
-        <Switch
-          value={isDeskMode}
-          onValueChange={handleToggle}
-          trackColor={{ false: theme.toggleBg, true: theme.accent }}
-          thumbColor={theme.textPrimary}
-        />
-      </View>
-    </View>
+      
+        
+          
+            {isDeskMode ? 'DESK' : 'OPEN'}
+          
+        
+        
+      
+    
   );
 };
 
@@ -53,6 +50,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 15,
+    width: '100%',
+    direction: 'ltr',
+  },
+  titleWrapper: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   appTitle: {
     fontSize: 24,
@@ -68,9 +71,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    direction: 'ltr',
+  },
+  labelContainer: {
+    minWidth: 50,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   toggleLabel: {
     fontSize: 12,
     fontWeight: '700',
+    textAlign: 'right',
   },
 });
