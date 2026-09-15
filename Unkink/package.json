@@ -8,6 +8,7 @@
     "@react-native-google-signin/google-signin": "^16.1.5",
     "@types/react": "~19.2.4",
     "@types/react-native": "^0.72.8",
+    "approve": "^0.0.12",
     "expo": "~57.0.22",
     "expo-auth-session": "~57.0.12",
     "expo-background-fetch": "~57.0.17",
@@ -25,7 +26,8 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4",
-    "react-native-web": "^0.21.2"
+    "react-native-web": "^0.21.2",
+    "scripts": "^0.1.0"
   },
   "scripts": {
     "start": "expo start",
