@@ -7,6 +7,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -19,6 +20,8 @@ import { BioMatrixCanvas } from './src/components/BioMatrixCanvas';
 import { ExercisePlayerSheet } from './src/components/ExercisePlayerSheet';
 import { WeeklyReviewScreen } from './src/components/WeeklyReviewScreen';
 import { registerGeminiBackgroundTask } from './src/services/geminiService';
+import AuthScreen, { type StoredUser } from './src/screens/AuthScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -30,6 +33,8 @@ Notifications.setNotificationHandler({
 });
 
 export default function App() {
+  const [authRoute, setAuthRoute] = useState<'checking' | 'auth' | 'onboarding' | 'home'>('checking');
+  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
   const [isDeskMode, setIsDeskMode] = useState<boolean>(true);
   const [bodyView, setBodyView] = useState<BodyView>('front');
   const [selectedZone, setSelectedZone] = useState<BodyZoneId | null>(null);
@@ -44,14 +49,41 @@ export default function App() {
 
   const activeTheme = isDeskMode ? deskTheme : openSpaceTheme;
 
+  const loadStoredUser = async () => {
+    try {
+      const savedUser = await AsyncStorage.getItem('@unkink_user');
+      if (!savedUser) {
+        setAuthRoute('auth');
+        return;
+      }
+
+      const parsedUser = JSON.parse(savedUser) as StoredUser;
+      setCurrentUser(parsedUser);
+
+      const onboardingCompleted = await AsyncStorage.getItem('@deskreset_onboarding_completed');
+      setAuthRoute(onboardingCompleted === 'true' ? 'home' : 'onboarding');
+    } catch (error) {
+      console.error('Failed to load stored user:', error);
+      setAuthRoute('auth');
+    }
+  };
+
   useEffect(() => {
+    loadStoredUser();
+  }, []);
+
+  useEffect(() => {
+    if (authRoute !== 'home') {
+      return;
+    }
+
     loadStreak();
     loadPreferences();
     requestNotificationPermissions();
     registerGeminiBackgroundTask().catch((error) => {
       console.error('Failed to register Gemini background task:', error);
     });
-  }, []);
+  }, [authRoute]);
 
   const loadStreak = async () => {
     try {
@@ -179,6 +211,47 @@ export default function App() {
     }
   };
 
+  const handleAuthSuccess = async (user: StoredUser, isNewUser: boolean) => {
+    setCurrentUser(user);
+    const onboardingCompleted = await AsyncStorage.getItem('@deskreset_onboarding_completed');
+    setAuthRoute(isNewUser || onboardingCompleted !== 'true' ? 'onboarding' : 'home');
+  };
+
+  const handleOnboardingComplete = async () => {
+    await AsyncStorage.setItem('@deskreset_onboarding_completed', 'true');
+    setAuthRoute('home');
+  };
+
+  if (authRoute === 'checking') {
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
+          <ActivityIndicator size="large" color="#00E5FF" />
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
+  }
+
+  if (authRoute === 'auth') {
+    return (
+      <SafeAreaProvider>
+        <AuthScreen
+          onAuthSuccess={handleAuthSuccess}
+          onGoToOnboarding={() => setAuthRoute('onboarding')}
+          onGoToHome={() => setAuthRoute('home')}
+        />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (authRoute === 'onboarding') {
+    return (
+      <SafeAreaProvider>
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
+      </SafeAreaProvider>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <SafeAreaView
@@ -214,7 +287,7 @@ export default function App() {
 
         {isWeeklyReviewVisible ? (
           <WeeklyReviewScreen
-            userId="demo-user"
+            userId={currentUser?.uid ?? 'demo-user'}
             onClose={() => setIsWeeklyReviewVisible(false)}
           />
         ) : null}
@@ -227,6 +300,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0A0C10',
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#090A0F',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalOverlay: {
     flex: 1,
