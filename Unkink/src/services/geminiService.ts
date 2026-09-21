@@ -207,8 +207,8 @@ export async function fetchDynamicSuggestionCards(): Promise<string[]> {
 
     return suggestions;
   } catch (error) {
-    console.warn('Dynamic suggestion cards failed; using fallback suggestions.', error);
-    return getFallbackSuggestionCards();
+    console.warn('Dynamic suggestion cards failed; caller will use fallback suggestions.', error);
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

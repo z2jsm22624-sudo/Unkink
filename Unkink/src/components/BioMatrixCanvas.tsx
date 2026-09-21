@@ -22,7 +22,7 @@ import {
   type BodyZoneId,
   type BodyView,
 } from '../constants/data';
-import { fetchDynamicSuggestionCards, getFallbackSuggestionCards } from '../services/geminiService';
+import { fetchDynamicSuggestionCards } from '../services/geminiService';
 
 interface BioMatrixCanvasProps {
   isDeskMode: boolean;
@@ -37,17 +37,25 @@ interface BioMatrixCanvasProps {
 
 type SuggestionCard = { text: string; zoneId: BodyZoneId };
 
-const MODE_SUGGESTION_MAP: Record<'desk' | 'open', SuggestionCard[]> = {
-  desk: [
-    { text: 'Neck tension', zoneId: 'neck' },
-    { text: 'Shoulder tightness', zoneId: 'shoulders' },
-    { text: 'Lower back strain', zoneId: 'torso' },
-  ],
-  open: [
-    { text: 'Upper back fatigue', zoneId: 'shoulders' },
-    { text: 'Tight hips', zoneId: 'lowerBody' },
-    { text: 'Wrist load', zoneId: 'wrists' },
-  ],
+const COMPLAINT_SUFFIXES = ['tension', 'tightness', 'strain', 'fatigue', 'stiffness'];
+
+// Builds one candidate card per exercise category so suggestions reflect the real exercise database.
+const buildSuggestionPool = (isDeskMode: boolean): SuggestionCard[] => {
+  const seen = new Set<string>();
+  const pool: SuggestionCard[] = [];
+
+  EXERCISE_LIBRARY.filter((exercise) => exercise.isDeskMode === isDeskMode).forEach((exercise) => {
+    const key = `${exercise.zoneId}-${exercise.category}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+
+    const suffix = COMPLAINT_SUFFIXES[Math.floor(Math.random() * COMPLAINT_SUFFIXES.length)];
+    pool.push({ text: `${exercise.category} ${suffix}`, zoneId: exercise.zoneId });
+  });
+
+  return pool;
 };
 
 const ZONE_KEYWORD_MAP: Array<{ zoneId: BodyZoneId; keywords: string[] }> = [
@@ -58,8 +66,25 @@ const ZONE_KEYWORD_MAP: Array<{ zoneId: BodyZoneId; keywords: string[] }> = [
   { zoneId: 'neck', keywords: ['neck', 'cervical', 'chin', 'headache', 'head', 'throat', 'stiff neck', 'tight neck'] },
 ];
 
-const getModeSpecificSuggestions = (isDeskMode: boolean): SuggestionCard[] =>
-  isDeskMode ? MODE_SUGGESTION_MAP.desk : MODE_SUGGESTION_MAP.open;
+const getModeSpecificSuggestions = (isDeskMode: boolean): SuggestionCard[] => {
+  const pool = buildSuggestionPool(isDeskMode);
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+
+  const picked: SuggestionCard[] = [];
+  const usedZones = new Set<BodyZoneId>();
+  for (const card of shuffled) {
+    if (usedZones.has(card.zoneId)) {
+      continue;
+    }
+    usedZones.add(card.zoneId);
+    picked.push(card);
+    if (picked.length === 3) {
+      break;
+    }
+  }
+
+  return picked.length > 0 ? picked : shuffled.slice(0, 3);
+};
 
 const getZoneForSuggestion = (text: string, isDeskMode: boolean): BodyZoneId | null => {
   const normalized = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
