@@ -22,8 +22,6 @@ import {
   type BodyZoneId,
   type BodyView,
 } from '../constants/data';
-import { fetchDynamicSuggestionCards } from '../services/geminiService';
-
 interface BioMatrixCanvasProps {
   isDeskMode: boolean;
   view: BodyView;
@@ -143,8 +141,6 @@ export const BioMatrixCanvas: React.FC<BioMatrixCanvasProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [typedIntro, setTypedIntro] = useState('');
   const [suggestions, setSuggestions] = useState<SuggestionCard[]>(() => getModeSpecificSuggestions(true));
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(true);
-  const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const activeTheme = isDeskMode ? deskTheme : openSpaceTheme;
   const introText = 'This is your Unkink manager. How are you feeling?';
   const introPauseMs = 500;
@@ -216,51 +212,7 @@ export const BioMatrixCanvas: React.FC<BioMatrixCanvasProps> = ({
   }, [isDeskMode, toggleFlip]);
 
   useEffect(() => {
-    const initialSuggestions = getModeSpecificSuggestions(isDeskMode);
-    setSuggestions(initialSuggestions);
-    setIsLoadingSuggestions(true);
-    setSuggestionError(null);
-
-    let isMounted = true;
-
-    const loadSuggestions = async () => {
-      try {
-        const nextSuggestions = await fetchDynamicSuggestionCards();
-        if (!isMounted) {
-          return;
-        }
-
-        const normalized = nextSuggestions
-          .filter((item) => item && item.trim().length > 0)
-          .slice(0, 3)
-          .map((text) => ({
-            text,
-            zoneId: getZoneForSuggestion(text, isDeskMode) ?? 'neck',
-          }));
-
-        if (normalized.length > 0) {
-          setSuggestions(normalized);
-        }
-      } catch (error) {
-        console.warn('Home suggestion load failed:', error);
-        if (!isMounted) {
-          return;
-        }
-
-        setSuggestionError('Using offline suggestions');
-        setSuggestions(getModeSpecificSuggestions(isDeskMode));
-      } finally {
-        if (isMounted) {
-          setIsLoadingSuggestions(false);
-        }
-      }
-    };
-
-    loadSuggestions();
-
-    return () => {
-      isMounted = false;
-    };
+    setSuggestions(getModeSpecificSuggestions(isDeskMode));
   }, [isDeskMode]);
 
   const handleModeFlip = (nextValue?: boolean) => {
@@ -493,10 +445,6 @@ export const BioMatrixCanvas: React.FC<BioMatrixCanvasProps> = ({
             ))}
           </View>
         )}
-
-        {suggestionError ? (
-          <Text style={[styles.inlineError, { color: palette.secondary }]}>{suggestionError}</Text>
-        ) : null}
       </View>
     </View>
   );
