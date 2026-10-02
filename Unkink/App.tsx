@@ -12,7 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 import { auth } from './src/config/firebase';
 import { deskTheme, openSpaceTheme } from './src/constants/themes';
@@ -25,6 +25,7 @@ import { registerGeminiBackgroundTask } from './src/services/geminiService';
 import { addExerciseWater, logCompletedExercise } from './src/services/waterStorageService';
 import AuthScreen, { type StoredUser } from './src/screens/AuthScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import AccountSettingsScreen from './src/screens/AccountSettingsScreen';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -65,6 +66,7 @@ export default function App() {
   const [selectedGender, setSelectedGender] = useState<'female' | 'male' | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<'seated' | 'open-space' | null>(null);
   const [isWeeklyReviewVisible, setIsWeeklyReviewVisible] = useState(false);
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
 
   const activeTheme = isDeskMode ? deskTheme : openSpaceTheme;
 
@@ -338,6 +340,24 @@ export default function App() {
     setAuthRoute('home');
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.warn('Firebase sign out failed:', error);
+    }
+
+    await AsyncStorage.removeItem('@unkink_user');
+    setCurrentUser(null);
+    setIsSettingsVisible(false);
+    setAuthRoute('auth');
+  };
+
+  const handleUserUpdated = async (user: StoredUser) => {
+    setCurrentUser(user);
+    await AsyncStorage.setItem('@unkink_user', JSON.stringify(user));
+  };
+
   if (authRoute === 'checking') {
     return (
       <SafeAreaProvider>
@@ -385,6 +405,7 @@ export default function App() {
           onToggleMode={setIsDeskMode}
           onToggleView={setBodyView}
           onOpenWeeklyReview={() => setIsWeeklyReviewVisible(true)}
+          onOpenSettings={() => setIsSettingsVisible(true)}
         />
 
         {selectedZone ? (
@@ -405,6 +426,15 @@ export default function App() {
           <WeeklyReviewScreen
             userId={currentUser?.uid ?? 'demo-user'}
             onClose={() => setIsWeeklyReviewVisible(false)}
+          />
+        ) : null}
+
+        {isSettingsVisible && currentUser ? (
+          <AccountSettingsScreen
+            user={currentUser}
+            onClose={() => setIsSettingsVisible(false)}
+            onSignOut={handleSignOut}
+            onUserUpdated={handleUserUpdated}
           />
         ) : null}
       </SafeAreaView>

@@ -31,6 +31,7 @@ interface BioMatrixCanvasProps {
   onToggleMode: (value: boolean) => void;
   onToggleView: (nextView: BodyView) => void;
   onOpenWeeklyReview: () => void;
+  onOpenSettings: () => void;
 }
 
 type SuggestionCard = { text: string; zoneId: BodyZoneId };
@@ -136,6 +137,7 @@ export const BioMatrixCanvas: React.FC<BioMatrixCanvasProps> = ({
   onToggleMode,
   onToggleView,
   onOpenWeeklyReview,
+  onOpenSettings,
 }) => {
   const [prompt, setPrompt] = useState('');
   const [isScanning, setIsScanning] = useState(false);
@@ -316,10 +318,21 @@ export const BioMatrixCanvas: React.FC<BioMatrixCanvasProps> = ({
         <View style={styles.titleRow}>
           <Text style={[styles.title, { color: palette.primary }]}>UNKINK AI</Text>
 
-          <Pressable onPress={onOpenWeeklyReview} style={styles.streakButton}>
-            <Text style={styles.streakIcon}>🔥</Text>
-            <Text style={styles.streakCount}>{streakCount}</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable onPress={onOpenWeeklyReview} style={styles.streakButton}>
+              <Text style={styles.streakIcon}>🔥</Text>
+              <Text style={styles.streakCount}>{streakCount}</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={onOpenSettings}
+              style={styles.settingsButton}
+              accessibilityRole="button"
+              accessibilityLabel="Open account settings"
+            >
+              <Text style={styles.settingsIcon}>⚙️</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.headerControls}>
@@ -486,6 +499,24 @@ const styles = StyleSheet.create({
   streakIcon: {
     fontSize: 14,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingsButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,229,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsIcon: {
+    fontSize: 15,
+  },
   streakCount: {
     color: '#EAFBFF',
     fontSize: 12,
@@ -579,6 +610,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 4,
     shadowOpacity: 0,
     shadowRadius: 0,
     elevation: 0,
