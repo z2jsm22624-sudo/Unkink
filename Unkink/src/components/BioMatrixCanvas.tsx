@@ -597,6 +597,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0,
     minHeight: 54,
     borderRadius: 16,
     paddingHorizontal: 16,
@@ -611,6 +612,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 4,
+    flexShrink: 0,
     shadowOpacity: 0,
     shadowRadius: 0,
     elevation: 0,
@@ -628,6 +630,8 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   card: {
+    flex: 1,
+    minWidth: 0,
     borderRadius: 18,
     borderWidth: 1,
     paddingHorizontal: 16,
