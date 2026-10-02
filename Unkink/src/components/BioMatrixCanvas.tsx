@@ -525,10 +525,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   toggleFaceFront: {
-    transform: [{ rotateY: '0deg' }, { scaleX: 1 }],
+    transform: [{ rotateY: '0deg' }],
   },
   toggleFaceBack: {
-    transform: [{ rotateY: '180deg' }, { scaleX: -1 }],
+    transform: [{ rotateY: '180deg' }],
   },
   toggleLabel: {
     fontSize: 9,
